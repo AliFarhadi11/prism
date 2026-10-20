@@ -73,3 +73,12 @@ test("light keeps losing a little at every surface, never gaining", () => {
   const segs = path(scene, 550);
   for (let i = 1; i < segs.length; i++) assert.ok(segs[i].I <= segs[i - 1].I);
 });
+
+test("a half-silvered mirror sends half the light on and reflects the other half", () => {
+  const scene: Scene = { lamp, pieces: [{ kind: "splitter", id: "s", x: 100, y: 0, a: Math.PI / 4, len: 60, move: "free" }], targets: [] };
+  const segs = trace(scene, [550]).segments.filter((s) => s.I > 0.3);
+  const onward = segs.find((s) => s.x0 >= 100 && Math.abs(s.y1 - s.y0) < 1e-6);
+  const turned = segs.find((s) => s.x0 >= 99 && Math.abs(s.x1 - s.x0) < 1e-6);
+  assert.ok(onward && turned, "one ray continues, one turns");
+  assert.ok(onward.I < 0.55 && turned.I < 0.55 && onward.I > 0.4 && turned.I > 0.4, "about half each");
+});

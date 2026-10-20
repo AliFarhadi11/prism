@@ -19,13 +19,13 @@ function readSolved(): number[] {
 }
 
 /** The game: one canvas for the room, a few quiet lines of type around it. */
-export function PrismGame() {
+export function PrismGame({ start = 0, solve = false }: { start?: number; solve?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
   const soundRef = useRef<Sound | null>(null);
   const viewRef = useRef<View>({ scale: 1, ox: 0, oy: 0, dpr: 1, reducedMotion: false });
 
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(start);
   const [solved, setSolved] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
   const [announce, setAnnounce] = useState("");
@@ -36,7 +36,7 @@ export function PrismGame() {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
     const sound = (soundRef.current = new Sound());
-    const game = (gameRef.current = new Game(levels[0], {
+    const game = (gameRef.current = new Game(levels[start], {
       onTarget: (i, lit) => {
         if (lit) sound.pluck(game.level.notes[i] * 2, 0, 0.08);
         const t = game.level.scene.targets[i];
@@ -56,6 +56,8 @@ export function PrismGame() {
       },
       onSay: setAnnounce,
     }));
+
+    if (solve) game.solve();
 
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const resize = () => {
@@ -137,6 +139,8 @@ export function PrismGame() {
       canvas.removeEventListener("keydown", onKey);
       sound.setNotes([]);
     };
+    // Mounted once: `start` and `solve` only set where the game begins.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const goTo = useCallback((i: number) => {
@@ -163,6 +167,22 @@ export function PrismGame() {
         <p className="mt-2.5 text-xs tracking-[0.14em] text-muted uppercase">
           {ROMAN[index]} · {level.title}
         </p>
+        {/* Solved: said where you read, never over the room. */}
+        <div aria-hidden={!solved} className={`mt-5 transition-opacity duration-[1400ms] ${solved ? "opacity-100" : "opacity-0"}`}>
+          <p className="font-serif text-[clamp(34px,4vw,52px)] leading-none italic [text-shadow:0_0_32px_rgb(255_255_255/0.22)]">Light, sorted.</p>
+          {index < levels.length - 1 ? (
+            <button
+              type="button"
+              tabIndex={solved ? 0 : -1}
+              onClick={() => goTo(index + 1)}
+              className="pointer-events-auto mt-3 text-xs tracking-[0.16em] text-muted uppercase underline-offset-4 hover:text-paper hover:underline focus-visible:outline-2 focus-visible:outline-paper/60"
+            >
+              Next puzzle →
+            </button>
+          ) : (
+            <p className="mt-3 text-xs tracking-[0.16em] text-muted uppercase">The last one. Thank you for playing.</p>
+          )}
+        </div>
       </header>
 
       <nav aria-label="Puzzles" className="absolute top-8 right-8 flex gap-1.5">
@@ -195,21 +215,6 @@ export function PrismGame() {
         {soundOn ? "Sound on" : "Sound off"}
       </button>
 
-      <div aria-hidden={!solved} className={`pointer-events-none absolute inset-x-0 top-[11vh] text-center transition-opacity duration-[1400ms] ${solved ? "opacity-100" : "opacity-0"}`}>
-        <h2 className="font-serif text-[clamp(48px,7vw,96px)] italic [text-shadow:0_0_40px_rgb(255_255_255/0.25)]">Light, sorted.</h2>
-        {index < levels.length - 1 ? (
-          <button
-            type="button"
-            tabIndex={solved ? 0 : -1}
-            onClick={() => goTo(index + 1)}
-            className="pointer-events-auto mt-3 text-xs tracking-[0.16em] text-muted uppercase underline-offset-4 hover:text-paper hover:underline focus-visible:outline-2 focus-visible:outline-paper/60"
-          >
-            Next puzzle →
-          </button>
-        ) : (
-          <p className="mt-3 text-xs tracking-[0.16em] text-muted uppercase">The last one. Thank you for playing.</p>
-        )}
-      </div>
 
       <p aria-live="polite" className="sr-only">
         {announce}

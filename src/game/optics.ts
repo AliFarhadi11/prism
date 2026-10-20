@@ -11,8 +11,10 @@ export type Mirror = { kind: "mirror"; id: string; x: number; y: number; a: numb
 export type Prism = { kind: "prism"; id: string; x: number; y: number; a: number; r: number; move: Move };
 /** Coloured glass: lets its colours through, absorbs the rest. */
 export type Filter = { kind: "filter"; id: string; x: number; y: number; a: number; len: number; colors: BandName[]; move: Move };
+/** Half-silvered mirror: lets half the light through and reflects the other half. */
+export type Splitter = { kind: "splitter"; id: string; x: number; y: number; a: number; len: number; move: Move };
 export type Wall = { kind: "wall"; id: string; x0: number; y0: number; x1: number; y1: number };
-export type Piece = Mirror | Prism | Filter | Wall;
+export type Piece = Mirror | Prism | Filter | Splitter | Wall;
 
 export type Target = { id: string; x: number; y: number; r: number; colors: BandName[] };
 export type Lamp = { x: number; y: number; a: number };
@@ -22,7 +24,7 @@ export type Segment = { x0: number; y0: number; x1: number; y1: number; l: numbe
 export type Spark = { x: number; y: number; l: number; I: number };
 export type Trace = { segments: Segment[]; sparks: Spark[]; hits: Map<string, Map<number, number>> };
 
-const LOSS = { mirror: 0.97, glass: 0.93, filter: 0.9, tir: 0.98 } as const;
+const LOSS = { mirror: 0.97, glass: 0.93, filter: 0.9, tir: 0.98, split: 0.48 } as const;
 /** Faint reflection off a glass face (Fresnel), drawn as a glint. */
 const GLINT = 0.035;
 const MAX_DEPTH = 16;
@@ -75,6 +77,7 @@ type Hit =
   | { kind: "mirror"; n: Vec }
   | { kind: "glass"; n: Vec }
   | { kind: "filter"; colors: BandName[] }
+  | { kind: "splitter"; n: Vec }
   | { kind: "wall" }
   | { kind: "target"; id: string };
 
@@ -106,6 +109,9 @@ export function trace(scene: Scene, lambdas: readonly number[] = LAMBDAS): Trace
         } else if (p.kind === "filter") {
           const [a, b] = ends(p);
           consider(raySegment(ray.o, ray.d, a, b), { kind: "filter", colors: p.colors });
+        } else if (p.kind === "splitter") {
+          const [a, b] = ends(p);
+          consider(raySegment(ray.o, ray.d, a, b), { kind: "splitter", n: norm([-(b[1] - a[1]), b[0] - a[0]]) });
         } else if (p.kind === "wall") {
           consider(raySegment(ray.o, ray.d, [p.x0, p.y0], [p.x1, p.y1]), { kind: "wall" });
         }
@@ -124,6 +130,10 @@ export function trace(scene: Scene, lambdas: readonly number[] = LAMBDAS): Trace
       if (h.kind === "mirror") {
         next(reflect(ray.d, h.n), ray.I * LOSS.mirror, false);
         out.sparks.push({ x: q[0], y: q[1], l, I: ray.I });
+      } else if (h.kind === "splitter") {
+        next(ray.d, ray.I * LOSS.split, ray.inside);
+        next(reflect(ray.d, h.n), ray.I * LOSS.split, false);
+        out.sparks.push({ x: q[0], y: q[1], l, I: ray.I * 0.5 });
       } else if (h.kind === "filter") {
         if (h.colors.some((c) => l >= FILTER_PASS[c].from && l <= FILTER_PASS[c].to)) next(ray.d, ray.I * LOSS.filter, ray.inside);
       } else if (h.kind === "glass") {

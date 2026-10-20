@@ -111,6 +111,7 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, view: View) {
   for (const p of scene.pieces) {
     if (p.kind === "mirror") drawMirror(ctx, p, game);
     if (p.kind === "filter") drawFilter(ctx, p, game);
+    if (p.kind === "splitter") drawSplitter(ctx, p, game);
   }
 
   // Film grain over everything.
@@ -211,6 +212,28 @@ function drawFilter(ctx: CanvasRenderingContext2D, f: Extract<Piece, { kind: "fi
     handle(ctx, b[0], b[1]);
   }
   if (f.move === "turn") pivot(ctx, f.x, f.y);
+}
+
+/** Half-silvered glass: a pale pane with a silver hairline, broken like a half-tone. */
+function drawSplitter(ctx: CanvasRenderingContext2D, m: Extract<Piece, { kind: "splitter" }>, game: Game) {
+  const [a, b] = ends(m);
+  ctx.lineCap = "butt";
+  ctx.strokeStyle = "rgba(200,215,255,0.14)";
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.moveTo(a[0], a[1]);
+  ctx.lineTo(b[0], b[1]);
+  ctx.stroke();
+  ctx.setLineDash([3, 3]);
+  ctx.strokeStyle = "rgba(240,244,252,0.85)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.setLineDash([]);
+  if (m.move !== "fixed" && isActive(game, m.id)) {
+    handle(ctx, a[0], a[1]);
+    handle(ctx, b[0], b[1]);
+  }
+  if (m.move === "turn") pivot(ctx, m.x, m.y);
 }
 
 function handle(ctx: CanvasRenderingContext2D, x: number, y: number) {

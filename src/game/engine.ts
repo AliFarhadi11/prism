@@ -1,11 +1,11 @@
 // The game's state and rules, independent of drawing and React: pieces the player handles, the
 // light traced through them each frame, targets lighting up, and the puzzle being solved.
 import { ROOM, type Level } from "./levels/helpers.ts";
-import { ends, insidePrism, prismCorners, trace, type Filter, type Mirror, type Piece, type Prism, type Scene, type Trace } from "./optics.ts";
+import { ends, insidePrism, prismCorners, trace, type Filter, type Mirror, type Piece, type Prism, type Scene, type Splitter, type Trace } from "./optics.ts";
 import { isLit, progress } from "./puzzle.ts";
 import { add, len, sub, toSegment, type Vec } from "./vec.ts";
 
-export type Movable = Mirror | Prism | Filter;
+export type Movable = Mirror | Prism | Filter | Splitter;
 export type Grab = { id: string; mode: "move" | "turn"; offset?: Vec; turnFrom?: number };
 
 export type TargetState = { progress: number; shown: number; lit: boolean; pulse: number };
@@ -235,7 +235,8 @@ export class Game {
     this.selected = id;
     const i = this.movables.findIndex((p) => p.id === id);
     const piece = this.movables[i];
-    const what = piece.kind === "prism" ? "prism" : piece.kind === "filter" ? `${piece.colors.join(" and ")} glass` : "mirror";
+    const what =
+      piece.kind === "prism" ? "prism" : piece.kind === "filter" ? `${piece.colors.join(" and ")} glass` : piece.kind === "splitter" ? "half mirror" : "mirror";
     this.events.onSay?.(`${what} ${i + 1} of ${this.movables.length} selected${piece.move === "turn" ? ", it can only turn" : ""}`);
     return true;
   }

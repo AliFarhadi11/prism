@@ -7,7 +7,7 @@ export const LAMBDAS: readonly number[] = Array.from({ length: 32 }, (_, i) => 4
  * Refractive index of the prism glass (Cauchy's equation). Real crown glass has B ≈ 4200 nm²;
  * Prism uses 30000 so the rainbow opens wide enough to play with. Short (blue) light bends more.
  */
-export const nGlass = (l: number) => 1.5 + 30000 / (l * l);
+export const nGlass = (l: number) => 1.5 + 45000 / (l * l);
 
 export type Rgb = readonly [number, number, number];
 

@@ -2,8 +2,8 @@
 import { BAND_NAMES, LAMBDAS, inBand, type BandName } from "./light.ts";
 import { trace, type Scene, type Target } from "./optics.ts";
 
-/** A target lights when each of its colours arrives at least this strongly… */
-export const ENOUGH = 0.5;
+/** A target lights when each of its colours arrives at least this strongly (a split beam carries about half)… */
+export const ENOUGH = 0.35;
 /** …and no other colour arrives more than this (white poured on a red target does not count). */
 export const STRAY = 0.25;
 

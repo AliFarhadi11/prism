@@ -6,7 +6,8 @@ import { colorOf, type Rgb } from "./light.ts";
 import { allLamps, ends, insidePrism, prismCorners, type Piece, type Prism, type Segment } from "./optics.ts";
 import { BAND_HUE, ROOM_COLORS, mixHue, rgba } from "./palette.ts";
 
-export type View = { scale: number; ox: number; oy: number; dpr: number; reducedMotion: boolean };
+/** `rotate`: the room is turned a quarter turn clockwise to fill a tall (portrait) screen. */
+export type View = { scale: number; ox: number; oy: number; dpr: number; reducedMotion: boolean; rotate: boolean };
 
 type Beam = { x0: number; y0: number; x1: number; y1: number; c: Rgb; w: number; inside: boolean };
 
@@ -70,7 +71,8 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, view: View) {
   ctx.fillRect(0, 0, cw, ch);
 
   const s = view.dpr * view.scale;
-  ctx.setTransform(s, 0, 0, s, view.dpr * view.ox, view.dpr * view.oy);
+  if (view.rotate) ctx.setTransform(0, s, -s, 0, view.dpr * (view.ox + ROOM.h * view.scale), view.dpr * view.oy);
+  else ctx.setTransform(s, 0, 0, s, view.dpr * view.ox, view.dpr * view.oy);
 
   // A table of faint dots, for a sense of space.
   ctx.fillStyle = ROOM_COLORS.dots;
@@ -128,7 +130,7 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, view: View) {
   ctx.globalCompositeOperation = "source-over";
 }
 
-const isActive = (game: Game, id: string) => game.selected === id || game.hover?.id === id || game.drag?.id === id;
+const isActive = (game: Game, id: string) => game.touch || game.selected === id || game.hover?.id === id || game.drag?.id === id;
 
 function drawWall(ctx: CanvasRenderingContext2D, w: Extract<Piece, { kind: "wall" }>) {
   ctx.lineCap = "round";
@@ -167,6 +169,7 @@ function drawGlassEdges(ctx: CanvasRenderingContext2D, p: Prism, game: Game) {
   ctx.lineWidth = 1.2;
   ctx.stroke();
   ctx.globalCompositeOperation = "source-over";
+  if (game.level.scene.targets.length === 0) return; // the title room: nothing to handle
   if (p.move !== "fixed" && isActive(game, p.id)) for (const [x, y] of prismCorners(p)) handle(ctx, x, y);
   if (p.move === "turn") pivot(ctx, p.x, p.y);
 }

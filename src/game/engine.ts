@@ -44,6 +44,10 @@ export class Game {
   hover: Grab | null = null;
   drag: Grab | null = null;
   selected: string | null = null;
+  /** Reach of a grab, in room units (set from screen size so fingers can always grab). */
+  grabRadius = GRAB;
+  /** Touch screens have no hover: handles are always shown. */
+  touch = false;
   solved = false;
   motes: Mote[];
   time = 0;
@@ -149,7 +153,7 @@ export class Game {
   /** What a pointer at `p` would grab: a piece's ends or corners turn it, its body moves it. */
   pick(p: Vec): Grab | null {
     let best: Grab | null = null;
-    let bestD = GRAB;
+    let bestD = this.grabRadius;
     for (const piece of this.movables) {
       if (piece.kind === "prism") {
         for (const c of prismCorners(piece)) {

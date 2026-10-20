@@ -18,7 +18,10 @@ export type Piece = Mirror | Prism | Filter | Splitter | Wall;
 
 export type Target = { id: string; x: number; y: number; r: number; colors: BandName[] };
 export type Lamp = { x: number; y: number; a: number };
-export type Scene = { lamp: Lamp; pieces: Piece[]; targets: Target[] };
+/** `lamp` is the main lamp; `lamps` adds more. */
+export type Scene = { lamp: Lamp; lamps?: Lamp[]; pieces: Piece[]; targets: Target[] };
+
+export const allLamps = (scene: Scene) => [scene.lamp, ...(scene.lamps ?? [])];
 
 export type Segment = { x0: number; y0: number; x1: number; y1: number; l: number; I: number; inside: boolean; tir?: boolean };
 export type Spark = { x: number; y: number; l: number; I: number };
@@ -90,7 +93,7 @@ export function trace(scene: Scene, lambdas: readonly number[] = LAMBDAS): Trace
   const faces = scene.pieces.filter((p): p is Prism => p.kind === "prism").flatMap((p) => prismFaces(p));
 
   for (const l of lambdas) {
-    const stack: Ray[] = [{ o: [scene.lamp.x, scene.lamp.y], d: fromAngle(scene.lamp.a), I: 1, depth: 0, inside: false }];
+    const stack: Ray[] = allLamps(scene).map((lamp) => ({ o: [lamp.x, lamp.y] as Vec, d: fromAngle(lamp.a), I: 1, depth: 0, inside: false }));
     while (stack.length) {
       const ray = stack.pop()!;
       let best = FAR;

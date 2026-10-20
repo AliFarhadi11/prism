@@ -31,3 +31,19 @@ test("magenta needs red and blue together, and no green", () => {
   assert.equal(isLit(magenta, only((l) => inBand(l, "red"))), false, "red alone is not magenta");
   assert.equal(isLit(magenta, white), false, "green spoils it");
 });
+
+const scaled = (m: Map<number, number>, k: number) => new Map([...m].map(([l, v]) => [l, v * k]));
+
+test("half-strength light (after a half mirror) still lights a target of its colour", () => {
+  // A half mirror, then a mirror, a prism and another mirror: about a quarter of the light is left.
+  assert.equal(isLit(target(["red"]), scaled(only((l) => inBand(l, "red")), 0.25)), true);
+  assert.equal(isLit(target(["red", "green", "blue"]), scaled(white, 0.25)), true);
+});
+
+test("purity: a faint stray colour is forgiven, a strong one is not, at any strength", () => {
+  const redWithFaintGreen = new Map([...only((l) => inBand(l, "red")), ...scaled(only((l) => inBand(l, "green")), 0.15)]);
+  assert.equal(isLit(target(["red"]), redWithFaintGreen), true);
+  assert.equal(isLit(target(["red"]), scaled(white, 0.25)), false, "quarter-strength white is still not red");
+  const weakRedStrongGreen = new Map([...scaled(only((l) => inBand(l, "red")), 0.25), ...scaled(only((l) => inBand(l, "green")), 0.2)]);
+  assert.equal(isLit(target(["red"]), weakRedStrongGreen), false, "stray judged against the wanted colour, not in absolute terms");
+});

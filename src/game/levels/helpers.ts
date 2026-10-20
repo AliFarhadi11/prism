@@ -56,3 +56,20 @@ export function targetOn(scene: Scene, id: string, colors: BandName[], via: Band
 }
 
 export const WHITE: BandName[] = ["red", "green", "blue"];
+
+/**
+ * How far (degrees, total) a piece of the solution can turn either way and still solve the
+ * level. Small numbers mean the player needs pixel-perfect aim.
+ */
+export function turnSlack(scene: Scene, solution: Solution, id: string, isSolved: (s: Scene) => boolean, step = 0.25) {
+  const solved = applySolution(scene, solution);
+  const turned = (da: number): Scene => ({
+    ...solved,
+    pieces: solved.pieces.map((p) => (p.id === id && p.kind !== "wall" ? ({ ...p, a: p.a + (da * Math.PI) / 180 } as Piece) : p)),
+  });
+  let lo = 0;
+  let hi = 0;
+  while (lo < 30 && isSolved(turned(-(lo + step)))) lo += step;
+  while (hi < 30 && isSolved(turned(hi + step))) hi += step;
+  return lo + hi;
+}

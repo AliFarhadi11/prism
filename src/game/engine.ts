@@ -25,7 +25,12 @@ type Mote = { x: number; y: number; vx: number; vy: number; s: number; ph: numbe
 const EASE = 0.3; // how quickly pieces follow the hand (per frame at 60 fps)
 const HOLD = 0.5; // seconds all targets must stay lit to count as solved
 const GRAB = 22; // reach of a grab, virtual units
-const TURN_STEP = (2 * Math.PI) / 180;
+const TURN_STEP = (1 * Math.PI) / 180;
+/** On release, a piece may be eased up to this far (radians) if that lights another target. */
+const SETTLE = (3 * Math.PI) / 180;
+const SETTLE_STEP = (0.25 * Math.PI) / 180;
+/** Keyboard turns settle once the keys have been quiet this long (seconds). */
+const KEY_SETTLE = 0.35;
 const MOVE_STEP = 6;
 
 const movable = (p: Piece): p is Movable => p.kind !== "wall" && p.move !== "fixed";
@@ -44,6 +49,7 @@ export class Game {
   time = 0;
   private goals = new Map<string, Goal>();
   private solvedFor = 0;
+  private settleAt: { id: string; time: number } | null = null;
 
   private events: GameEvents;
 
@@ -115,6 +121,11 @@ export class Game {
       s.pulse = Math.max(0, s.pulse - dt * 0.8);
       all &&= lit;
     });
+
+    if (this.settleAt && this.time >= this.settleAt.time) {
+      this.release(this.settleAt.id);
+      this.settleAt = null;
+    }
 
     this.solvedFor = all ? this.solvedFor + dt : 0;
     if (!this.solved && this.solvedFor >= HOLD) {
@@ -195,7 +206,46 @@ export class Game {
   }
 
   pointerUp() {
+    if (this.drag) this.release(this.drag.id);
     this.drag = null;
+  }
+
+  /** Move a piece's goal directly (tests, hints). */
+  setGoal(id: string, change: Partial<Goal>) {
+    const g = this.goals.get(id);
+    if (g) Object.assign(g, change);
+  }
+
+  /**
+   * The player let go of a piece. If turning it a little (at most SETTLE) would light more
+   * targets, ease it there: the light finds its way home. It never solves anything from afar.
+   */
+  release(id: string) {
+    const goal = this.goals.get(id);
+    const piece = this.piece(id);
+    if (!goal || !piece) return;
+    const lit = (a: number) => {
+      const scene: Scene = {
+        ...this.scene,
+        pieces: this.scene.pieces.map((p) => {
+          if (!movable(p)) return p;
+          const g = this.goals.get(p.id)!;
+          return { ...p, x: g.x, y: g.y, a: p.id === id ? a : g.a };
+        }),
+      };
+      const { hits } = trace(scene);
+      return scene.targets.filter((t) => isLit(t, hits.get(t.id) ?? new Map())).length;
+    };
+    const now = lit(goal.a);
+    let best = { count: now, a: goal.a };
+    for (let d = SETTLE_STEP; d <= SETTLE + 1e-9; d += SETTLE_STEP) {
+      for (const a of [goal.a - d, goal.a + d]) {
+        const count = lit(a);
+        if (count > best.count) best = { count, a };
+      }
+      if (best.count > now) break; // the nearest angle that lights more wins
+    }
+    goal.a = best.a;
   }
 
   wheel(p: Vec, dy: number) {
@@ -226,8 +276,9 @@ export class Game {
       goal.y = clampY(goal.y + moves[key][1]);
       return true;
     }
-    if (key === "q" || key === "Q") return (goal.a -= turn), true;
-    if (key === "e" || key === "E") return (goal.a += turn), true;
+    const settleLater = () => (this.settleAt = { id: piece.id, time: this.time + KEY_SETTLE });
+    if (key === "q" || key === "Q") return (goal.a -= turn), settleLater(), true;
+    if (key === "e" || key === "E") return (goal.a += turn), settleLater(), true;
     return false;
   }
 

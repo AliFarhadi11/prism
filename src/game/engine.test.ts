@@ -69,3 +69,26 @@ test("putting the pieces in the solution solves the level, once lit for a moment
   assert.deepEqual(events, [true]);
   assert.ok(game.targets.every((t) => t.lit));
 });
+
+test("letting go just off the mark: the light finds the target (up to 3°)", () => {
+  const game = new Game(levels[0]);
+  game.solve();
+  game.setGoal("mirror", { a: (game.level.solution.mirror.a ?? 0) + (2.5 * Math.PI) / 180 });
+  settle(game, 1);
+  assert.equal(game.targets[0].lit, false, "2.5° off is not lit by itself");
+  game.release("mirror");
+  settle(game, 1.5);
+  assert.equal(game.targets[0].lit, true);
+});
+
+test("letting go far off the mark changes nothing: no puzzle solves itself", () => {
+  const game = new Game(levels[0]);
+  game.solve();
+  const off = (game.level.solution.mirror.a ?? 0) + (12 * Math.PI) / 180;
+  game.setGoal("mirror", { a: off });
+  settle(game, 1);
+  game.release("mirror");
+  settle(game, 1);
+  assert.equal(game.targets[0].lit, false);
+  assert.ok(Math.abs(game.piece("mirror")!.a - off) < 1e-3);
+});

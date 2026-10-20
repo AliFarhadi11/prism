@@ -3,7 +3,7 @@
 import type { Game } from "./engine.ts";
 import { ROOM } from "./levels/helpers.ts";
 import { colorOf, type Rgb } from "./light.ts";
-import { ends, insidePrism, prismCorners, type Piece, type Prism, type Segment } from "./optics.ts";
+import { allLamps, ends, insidePrism, prismCorners, type Piece, type Prism, type Segment } from "./optics.ts";
 import { BAND_HUE, ROOM_COLORS, mixHue, rgba } from "./palette.ts";
 
 export type View = { scale: number; ox: number; oy: number; dpr: number; reducedMotion: boolean };
@@ -107,7 +107,7 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, view: View) {
   ctx.globalCompositeOperation = "source-over";
   drawTargets(ctx, game);
   for (const p of scene.pieces) if (p.kind === "prism") drawGlassEdges(ctx, p, game);
-  drawLamp(ctx, scene.lamp.x, scene.lamp.y, scene.lamp.a);
+  for (const lamp of allLamps(scene)) drawLamp(ctx, lamp.x, lamp.y, lamp.a);
   for (const p of scene.pieces) {
     if (p.kind === "mirror") drawMirror(ctx, p, game);
     if (p.kind === "filter") drawFilter(ctx, p, game);

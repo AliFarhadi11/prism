@@ -5,7 +5,7 @@ import { WHITE, mirrorAngle, type Level } from "./helpers.ts";
 
 const lamp = { x: 120, y: 560, a: 0 };
 const mirror: Mirror = { kind: "mirror", id: "mirror", x: 560, y: 250, a: 0.5, len: 96, move: "free" };
-const target = { id: "light", x: 1000, y: 190, r: 22, colors: WHITE };
+const target = { id: "light", x: 1000, y: 190, r: 24, colors: WHITE };
 const at = { x: 720, y: lamp.y };
 
 export const firstLight: Level = {

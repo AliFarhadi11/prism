@@ -82,3 +82,18 @@ test("a half-silvered mirror sends half the light on and reflects the other half
   assert.ok(onward && turned, "one ray continues, one turns");
   assert.ok(onward.I < 0.55 && turned.I < 0.55 && onward.I > 0.4 && turned.I > 0.4, "about half each");
 });
+
+test("a scene can have more than one lamp, and both light up the room", () => {
+  const scene: Scene = {
+    lamp,
+    lamps: [{ x: 0, y: 100, a: 0 }],
+    pieces: [],
+    targets: [
+      { id: "a", x: 200, y: 0, r: 10, colors: ["red", "green", "blue"] },
+      { id: "b", x: 200, y: 100, r: 10, colors: ["red", "green", "blue"] },
+    ],
+  };
+  const { hits } = trace(scene, [550]);
+  assert.ok((hits.get("a")?.get(550) ?? 0) > 0.9);
+  assert.ok((hits.get("b")?.get(550) ?? 0) > 0.9);
+});

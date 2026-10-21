@@ -9,13 +9,31 @@
   --font-mono: var(--font-plex), ui-monospace, monospace;
 }
 
+/* A phone on its side: too short for the desktop layout, so everything packs into one row above and below the room. */
+@custom-variant short (@media (min-width: 40rem) and (max-height: 32.5rem));
+
 @layer base {
+  /* A game, not a page: no tap flash, no pull-to-refresh, no font inflation in landscape. */
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+
   html,
   body {
+    overscroll-behavior: none;
     height: 100%;
     background-color: var(--color-night);
     color: var(--color-paper);
     font-family: var(--font-mono);
     overflow: hidden;
+  }
+
+  /* Controls answer the tap at once, and a long press doesn't select their labels. */
+  button {
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
 }

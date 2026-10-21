@@ -50,6 +50,9 @@ function grainTexture() {
   return grain;
 }
 
+/** Room units per CSS pixel, so pieces and handles never draw thinner than a finger can find. */
+let px = 1;
+
 const PASSES: Array<[number, number]> = [
   [26, 0.03],
   [9, 0.07],
@@ -70,6 +73,7 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, view: View) {
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, cw, ch);
 
+  px = 1 / view.scale;
   const s = view.dpr * view.scale;
   if (view.rotate) ctx.setTransform(0, s, -s, 0, view.dpr * (view.ox + ROOM.h * view.scale), view.dpr * view.oy);
   else ctx.setTransform(s, 0, 0, s, view.dpr * view.ox, view.dpr * view.oy);
@@ -170,7 +174,7 @@ function drawGlassEdges(ctx: CanvasRenderingContext2D, p: Prism, game: Game) {
   ctx.stroke();
   ctx.globalCompositeOperation = "source-over";
   if (game.level.scene.targets.length === 0) return; // the title room: nothing to handle
-  if (p.move !== "fixed" && isActive(game, p.id)) for (const [x, y] of prismCorners(p)) handle(ctx, x, y);
+  handles(ctx, game, p, prismCorners(p));
   if (p.move === "turn") pivot(ctx, p.x, p.y);
 }
 
@@ -178,7 +182,7 @@ function drawMirror(ctx: CanvasRenderingContext2D, m: Extract<Piece, { kind: "mi
   const [a, b] = ends(m);
   ctx.lineCap = "round";
   ctx.strokeStyle = ROOM_COLORS.mirrorBack;
-  ctx.lineWidth = 7;
+  ctx.lineWidth = Math.max(7, 4.5 * px);
   ctx.beginPath();
   ctx.moveTo(a[0], a[1]);
   ctx.lineTo(b[0], b[1]);
@@ -186,12 +190,9 @@ function drawMirror(ctx: CanvasRenderingContext2D, m: Extract<Piece, { kind: "mi
   const g = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
   ROOM_COLORS.mirrorStops.forEach((c, i) => g.addColorStop([0, 0.45, 0.55, 1][i], c));
   ctx.strokeStyle = g;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = Math.max(3, 2 * px);
   ctx.stroke();
-  if (m.move !== "fixed" && isActive(game, m.id)) {
-    handle(ctx, a[0], a[1]);
-    handle(ctx, b[0], b[1]);
-  }
+  handles(ctx, game, m, [a, b]);
   if (m.move === "turn") pivot(ctx, m.x, m.y);
 }
 
@@ -200,20 +201,17 @@ function drawFilter(ctx: CanvasRenderingContext2D, f: Extract<Piece, { kind: "fi
   const hue = mixHue(f.colors);
   ctx.lineCap = "butt";
   ctx.strokeStyle = rgba(hue, 0.28);
-  ctx.lineWidth = 9;
+  ctx.lineWidth = Math.max(9, 5 * px);
   ctx.beginPath();
   ctx.moveTo(a[0], a[1]);
   ctx.lineTo(b[0], b[1]);
   ctx.stroke();
   ctx.globalCompositeOperation = "lighter";
   ctx.strokeStyle = rgba(hue, 0.75);
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = Math.max(1.2, px);
   ctx.stroke();
   ctx.globalCompositeOperation = "source-over";
-  if (f.move !== "fixed" && isActive(game, f.id)) {
-    handle(ctx, a[0], a[1]);
-    handle(ctx, b[0], b[1]);
-  }
+  handles(ctx, game, f, [a, b]);
   if (f.move === "turn") pivot(ctx, f.x, f.y);
 }
 
@@ -222,29 +220,37 @@ function drawSplitter(ctx: CanvasRenderingContext2D, m: Extract<Piece, { kind: "
   const [a, b] = ends(m);
   ctx.lineCap = "butt";
   ctx.strokeStyle = "rgba(200,215,255,0.14)";
-  ctx.lineWidth = 8;
+  ctx.lineWidth = Math.max(8, 5 * px);
   ctx.beginPath();
   ctx.moveTo(a[0], a[1]);
   ctx.lineTo(b[0], b[1]);
   ctx.stroke();
-  ctx.setLineDash([3, 3]);
+  const dash = Math.max(3, 2 * px);
+  ctx.setLineDash([dash, dash]);
   ctx.strokeStyle = "rgba(240,244,252,0.85)";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = Math.max(2, 1.5 * px);
   ctx.stroke();
   ctx.setLineDash([]);
-  if (m.move !== "fixed" && isActive(game, m.id)) {
-    handle(ctx, a[0], a[1]);
-    handle(ctx, b[0], b[1]);
-  }
+  handles(ctx, game, m, [a, b]);
   if (m.move === "turn") pivot(ctx, m.x, m.y);
 }
 
-function handle(ctx: CanvasRenderingContext2D, x: number, y: number) {
-  ctx.strokeStyle = "rgba(233,230,223,0.55)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(x, y, 8, 0, Math.PI * 2);
-  ctx.stroke();
+/** Rings at a piece's ends or corners, where it turns. On touch the selected piece's are filled. */
+function handles(ctx: CanvasRenderingContext2D, game: Game, p: Piece, at: readonly (readonly [number, number])[]) {
+  if (p.kind === "wall" || p.move === "fixed" || !isActive(game, p.id)) return;
+  const chosen = game.selected === p.id || game.drag?.id === p.id;
+  const r = game.touch ? Math.max(8, 9 * px) : 8;
+  ctx.lineWidth = Math.max(1, px);
+  for (const [x, y] of at) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    if (game.touch && chosen) {
+      ctx.fillStyle = "rgba(233,230,223,0.16)";
+      ctx.fill();
+    }
+    ctx.strokeStyle = game.touch && !chosen ? "rgba(233,230,223,0.32)" : "rgba(233,230,223,0.6)";
+    ctx.stroke();
+  }
 }
 
 /** A small pin: this piece turns in place but cannot be moved. */
@@ -252,7 +258,7 @@ function pivot(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.fillStyle = ROOM_COLORS.paper;
   ctx.globalAlpha = 0.7;
   ctx.beginPath();
-  ctx.arc(x, y, 2.6, 0, Math.PI * 2);
+  ctx.arc(x, y, Math.max(2.6, 2 * px), 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
 }

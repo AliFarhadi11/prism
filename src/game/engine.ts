@@ -6,7 +6,7 @@ import { isLit, progress } from "./puzzle.ts";
 import { add, len, sub, toSegment, type Vec } from "./vec.ts";
 
 export type Movable = Mirror | Prism | Filter | Splitter;
-export type Grab = { id: string; mode: "move" | "turn"; offset?: Vec; turnFrom?: number };
+export type Grab = { id: string; mode: "move" | "turn"; offset?: Vec; turnLast?: number };
 
 export type TargetState = { progress: number; shown: number; lit: boolean; pulse: number };
 
@@ -17,6 +17,8 @@ export type GameEvents = {
   onSolved?: (solved: boolean) => void;
   /** Something worth announcing to screen readers. */
   onSay?: (text: string) => void;
+  /** The selected piece changed: its name ("mirror", "red glass"), or null for none. */
+  onSelect?: (name: string | null) => void;
 };
 
 type Goal = { x: number; y: number; a: number };
@@ -25,7 +27,7 @@ type Mote = { x: number; y: number; vx: number; vy: number; s: number; ph: numbe
 const EASE = 0.3; // how quickly pieces follow the hand (per frame at 60 fps)
 const HOLD = 0.5; // seconds all targets must stay lit to count as solved
 const GRAB = 22; // reach of a grab, virtual units
-const TURN_STEP = (1 * Math.PI) / 180;
+export const TURN_STEP = (1 * Math.PI) / 180;
 /** On release, a piece may be eased up to this far (radians) if that lights another target. */
 const SETTLE = (3 * Math.PI) / 180;
 const SETTLE_STEP = (0.25 * Math.PI) / 180;
@@ -34,6 +36,8 @@ const KEY_SETTLE = 0.35;
 const MOVE_STEP = 6;
 
 const movable = (p: Piece): p is Movable => p.kind !== "wall" && p.move !== "fixed";
+const nameOf = (p: Movable) =>
+  p.kind === "prism" ? "prism" : p.kind === "filter" ? `${p.colors.join(" and ")} glass` : p.kind === "splitter" ? "half mirror" : "mirror";
 const angleLerp = (a: number, b: number, k: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
 
 export class Game {
@@ -80,7 +84,7 @@ export class Game {
     this.targets = level.scene.targets.map(() => ({ progress: 0, shown: 0, lit: false, pulse: 0 }));
     this.solved = false;
     this.solvedFor = 0;
-    this.selected = null;
+    this.choose(null);
     this.drag = this.hover = null;
     this.resetGoals();
     this.light = trace(this.scene);
@@ -150,35 +154,33 @@ export class Game {
     }
   }
 
-  /** What a pointer at `p` would grab: a piece's ends or corners turn it, its body moves it. */
+  /**
+   * What a pointer at `p` would grab: a piece's ends or corners turn it, its body moves it. On the
+   * piece, the turning zone is capped by its size, so a finger-sized reach on a small screen
+   * can't swallow the whole body; just past a tip, the full reach turns.
+   */
   pick(p: Vec): Grab | null {
     let best: Grab | null = null;
     let bestD = this.grabRadius;
     for (const piece of this.movables) {
+      const body = piece.move === "free" ? "move" : "turn";
       if (piece.kind === "prism") {
-        for (const c of prismCorners(piece)) {
-          const d = len(sub(p, c));
-          if (d < bestD) {
-            best = { id: piece.id, mode: "turn" };
-            bestD = d;
-          }
+        const corner = Math.min(...prismCorners(piece).map((c) => len(sub(p, c))));
+        if (insidePrism(piece, p)) {
+          if (!best) best = { id: piece.id, mode: corner < Math.min(this.grabRadius, piece.r * 0.45) ? "turn" : body };
+        } else if (corner < bestD) {
+          best = { id: piece.id, mode: "turn" };
+          bestD = corner;
         }
-        if (!best && insidePrism(piece, p)) best = { id: piece.id, mode: piece.move === "free" ? "move" : "turn" };
         continue;
       }
       const [a, b] = ends(piece);
-      for (const e of [a, b]) {
-        const d = len(sub(p, e));
-        if (d < bestD) {
-          best = { id: piece.id, mode: "turn" };
-          bestD = d;
-        }
-      }
-      const { d } = toSegment(p, a, b);
-      if (d < bestD && best?.mode !== "turn") {
-        best = { id: piece.id, mode: piece.move === "free" ? "move" : "turn" };
-        bestD = d;
-      }
+      const { d, t } = toSegment(p, a, b);
+      if (d >= bestD) continue;
+      const pastTip = t === 0 || t === 1;
+      const nearTip = Math.min(t, 1 - t) * piece.len < Math.min(this.grabRadius, piece.len * 0.3);
+      best = { id: piece.id, mode: pastTip || nearTip ? "turn" : body };
+      bestD = d;
     }
     return best;
   }
@@ -188,9 +190,9 @@ export class Game {
     if (!grab) return false;
     const goal = this.goals.get(grab.id)!;
     grab.offset = sub([goal.x, goal.y], p);
-    grab.turnFrom = Math.atan2(p[1] - goal.y, p[0] - goal.x) - goal.a;
+    grab.turnLast = Math.atan2(p[1] - goal.y, p[0] - goal.x);
     this.drag = grab;
-    this.selected = grab.id;
+    this.choose(grab.id);
     return true;
   }
 
@@ -205,7 +207,13 @@ export class Game {
       goal.x = clampX(q[0]);
       goal.y = clampY(q[1]);
     } else {
-      goal.a = Math.atan2(p[1] - goal.y, p[0] - goal.x) - this.drag.turnFrom!;
+      // Follows the pointer around the piece's center. On touch, a finger close to the center
+      // turns it more slowly, so a short piece can still be set to the degree.
+      const at = Math.atan2(p[1] - goal.y, p[0] - goal.x);
+      const d = Math.atan2(Math.sin(at - this.drag.turnLast!), Math.cos(at - this.drag.turnLast!));
+      const lever = this.touch ? Math.max(0.2, Math.min(1, len(sub(p, [goal.x, goal.y])) / (this.grabRadius * 2))) : 1;
+      goal.a += d * lever;
+      this.drag.turnLast = at;
     }
   }
 
@@ -280,19 +288,33 @@ export class Game {
       goal.y = clampY(goal.y + moves[key][1]);
       return true;
     }
-    const settleLater = () => (this.settleAt = { id: piece.id, time: this.time + KEY_SETTLE });
-    if (key === "q" || key === "Q") return (goal.a -= turn), settleLater(), true;
-    if (key === "e" || key === "E") return (goal.a += turn), settleLater(), true;
+    if (key === "q" || key === "Q") return this.turn(-turn);
+    if (key === "e" || key === "E") return this.turn(turn);
     return false;
   }
 
-  private select(id: string) {
+  /** Turn the selected piece by `da` radians (keys, on-screen buttons); it settles once they stop. */
+  turn(da: number) {
+    const id = this.selected;
+    const goal = id ? this.goals.get(id) : null;
+    if (!id || !goal) return false;
+    goal.a += da;
+    this.settleAt = { id, time: this.time + KEY_SETTLE };
+    return true;
+  }
+
+  private choose(id: string | null) {
+    if (id === this.selected) return;
     this.selected = id;
+    const piece = id ? this.piece(id) : null;
+    this.events.onSelect?.(piece ? nameOf(piece) : null);
+  }
+
+  private select(id: string) {
+    this.choose(id);
     const i = this.movables.findIndex((p) => p.id === id);
     const piece = this.movables[i];
-    const what =
-      piece.kind === "prism" ? "prism" : piece.kind === "filter" ? `${piece.colors.join(" and ")} glass` : piece.kind === "splitter" ? "half mirror" : "mirror";
-    this.events.onSay?.(`${what} ${i + 1} of ${this.movables.length} selected${piece.move === "turn" ? ", it can only turn" : ""}`);
+    this.events.onSay?.(`${nameOf(piece)} ${i + 1} of ${this.movables.length} selected${piece.move === "turn" ? ", it can only turn" : ""}`);
     return true;
   }
 

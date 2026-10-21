@@ -10,7 +10,8 @@ export const metadata: Metadata = {
   description: "A light puzzle. Bend white light with mirrors and glass, split it into colours, and send each one home.",
 };
 
-export const viewport: Viewport = { themeColor: "#07080c" };
+// `cover`: the room paints edge to edge; controls pad themselves clear of the notch and home bar.
+export const viewport: Viewport = { themeColor: "#07080c", viewportFit: "cover" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

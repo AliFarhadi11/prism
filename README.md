@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Prism
 
-## Getting Started
+A light puzzle for the browser. Bend white light with mirrors and glass, split it into colours, and send each colour to its target.
 
-First, run the development server:
+Each of the nine puzzles adds one idea: mirrors, walls, a prism, filters, half-silvered mirrors, mixing colours, and finally the whole spectrum. Light is traced as 32 separate wavelengths. Glass bends each one by a slightly different amount (Cauchy's equation), so the rainbow comes out of the physics and isn't drawn on afterwards.
+
+## Playing
+
+- **Mouse or touch:** drag a piece's body to move it, or drag its ends or corners to turn it. The scroll wheel also turns it.
+- **Keyboard:** number keys or `[` and `]` pick a piece, arrow keys move it, `Q` and `E` turn it. Hold `Shift` for bigger steps.
+- Some pieces only turn and some don't move at all.
+- Progress is saved in the browser. `?p=3` links straight to puzzle three.
+
+## Running it
+
+You need Node 22.18 or newer and [pnpm](https://pnpm.io).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+pnpm dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+In development, `?p=3&solve` opens puzzle three with its pieces already in the solved position.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm test       # optics, engine, and a solvability check for every puzzle
+pnpm typecheck
+pnpm lint
+pnpm build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## How it's put together
 
-## Learn More
+Built with Next.js, React and Tailwind. The game runs on a single canvas.
 
-To learn more about Next.js, take a look at the following resources:
+| Path | What's there |
+| --- | --- |
+| `src/game/light.ts` | Wavelengths, refractive index, and how wavelengths map to colour |
+| `src/game/optics.ts` | Pieces (mirrors, prisms, filters, half mirrors, walls) and the ray tracer |
+| `src/game/engine.ts` | Game state, dragging and keyboard input, target checks |
+| `src/game/puzzle.ts` | When a target counts as lit and when a puzzle is solved |
+| `src/game/render.ts` | Canvas drawing |
+| `src/game/audio.ts` | Web Audio sounds |
+| `src/game/levels/` | One file per puzzle, each with its solution |
+| `src/components/PrismGame.tsx` | The page: title screen, puzzle list, input wiring |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[MIT](LICENSE)

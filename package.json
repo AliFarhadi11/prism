@@ -2,6 +2,11 @@
   "name": "prism",
   "version": "0.1.0",
   "private": true,
+  "description": "A light puzzle: bend white light with mirrors and glass, split it into colours, and send each one home.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
